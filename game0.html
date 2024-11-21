@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Circle Survival Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #f0f0f0;
+            overflow: hidden; /* Ensures circles don't visually overflow */
+        }
+
+        .target {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: red;
+            border-radius: 50%;
+        }
+
+        .gray-circle {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: gray;
+            border-radius: 50%;
+        }
+
+        .scoreboard {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 1.2rem;
+        }
+
+        .instructions {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 1.2rem;
+            width: 200px;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            color: red;
+            display: none;
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .play-again {
+            display: none;
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .play-again:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="scoreboard">Time: <span id="score">0</span> seconds</div>
+        <div class="instructions">
+            <strong>How to Play:</strong>
+            <ul>
+                <li>Use arrow keys to move the red circle.</li>
+                <li>Avoid the gray circles.</li>
+                <li>Don't get close to the walls.</li>
+                <li>Survive as long as you can!</li>
+            </ul>
+        </div>
+        <div class="game-over" id="game-over"></div>
+        <button class="play-again" id="play-again">Play Again</button>
+        <div class="target" id="target"></div>
+    </div>
+
+    <script>
+        const target = document.getElementById("target");
+        const scoreboard = document.getElementById("score");
+        const gameOverText = document.getElementById("game-over");
+        const playAgainButton = document.getElementById("play-again");
+        const container = document.querySelector(".game-container");
+
+        let timeSurvived = 0;
+        let isGameOver = false;
+        let grayCircles = [];
+
+        // Red target (player-controlled)
+        let targetX = 100;
+        let targetY = 100;
+        const targetRadius = 25; // Half of the target's width (50px)
+        const targetSpeed = 5;
+        const keys = {};
+
+        // Get container dimensions dynamically
+        function getContainerDimensions() {
+            return {
+                width: container.offsetWidth,
+                height: container.offsetHeight,
+            };
+        }
+
+        // Create a gray circle
+        function createGrayCircle() {
+            const { width: containerWidth, height: containerHeight } = getContainerDimensions();
+
+            const grayCircle = document.createElement("div");
+            grayCircle.classList.add("gray-circle");
+            container.appendChild(grayCircle);
+
+            const initialSize = 50;
+            const circle = {
+                element: grayCircle,
+                x: Math.random() * (containerWidth - initialSize),
+                y: Math.random() * (containerHeight - initialSize),
+                velocityX: (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2),
+                velocityY: (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2),
+                radius: initialSize / 2,
+            };
+
+            grayCircles.push(circle);
+        }
+
+        // Move a gray circle and handle wall collisions
+        function moveGrayCircle(circle) {
+        const { width: containerWidth, height: containerHeight } = getContainerDimensions();
+
+        circle.x += circle.velocityX;
+        circle.y += circle.velocityY;
+
+        // Handle horizontal wall collisions
+        if (circle.x <= 0 || circle.x >= containerWidth - circle.radius * 2) {
+            const angle = Math.atan2(circle.velocityY, circle.velocityX); // Current angle
+            const newAngle = Math.PI - angle + (Math.random() - 0.5) * 0.1; // Reflect angle and add small random offset
+            const speed = Math.sqrt(circle.velocityX ** 2 + circle.velocityY ** 2); // Current speed
+            circle.velocityX = Math.cos(newAngle) * speed;
+            circle.velocityY = Math.sin(newAngle) * speed;
+
+            // Ensure position stays within bounds
+            circle.x = Math.max(0, Math.min(circle.x, containerWidth - circle.radius * 2));
+        }
+
+        // Handle vertical wall collisions
+        if (circle.y <= 0 || circle.y >= containerHeight - circle.radius * 2) {
+            const angle = Math.atan2(circle.velocityY, circle.velocityX); // Current angle
+            const newAngle = -angle + (Math.random() - 0.5) * 0.1; // Reflect angle and add small random offset
+            const speed = Math.sqrt(circle.velocityX ** 2 + circle.velocityY ** 2); // Current speed
+            circle.velocityX = Math.cos(newAngle) * speed;
+            circle.velocityY = Math.sin(newAngle) * speed;
+
+            // Ensure position stays within bounds
+            circle.y = Math.max(0, Math.min(circle.y, containerHeight - circle.radius * 2));
+        }
+
+        // Increase size over time
+        circle.radius += 0.025;
+
+        // Update size and position
+        circle.element.style.width = `${circle.radius * 2}px`;
+        circle.element.style.height = `${circle.radius * 2}px`;
+        circle.element.style.left = `${circle.x}px`;
+        circle.element.style.top = `${circle.y}px`;
+    }
+
+
+        // Handle player movement
+        function handlePlayerMovement() {
+          const { width: containerWidth, height: containerHeight } = getContainerDimensions();
+
+          let targetVelocityX = 0;
+          let targetVelocityY = 0;
+
+          if (keys["ArrowUp"]) {
+              targetVelocityY = -targetSpeed;
+          }
+          if (keys["ArrowDown"]) {
+              targetVelocityY = targetSpeed;
+          }
+          if (keys["ArrowLeft"]) {
+              targetVelocityX = -targetSpeed;
+          }
+          if (keys["ArrowRight"]) {
+              targetVelocityX = targetSpeed;
+          }
+
+          // Update position
+          targetX += targetVelocityX;
+          targetY += targetVelocityY;
+
+          // Check if red circle touches the walls
+          if (
+              targetX <= 0 || // Left wall
+              targetX + target.offsetWidth >= containerWidth || // Right wall
+              targetY <= 0 || // Top wall
+              targetY + target.offsetHeight >= containerHeight // Bottom wall
+          ) {
+              gameOver(); // Trigger game over
+              return; // Stop further movement
+          }
+
+          // Constrain position to ensure the red circle does not go beyond the container (optional visual)
+          targetX = Math.max(0, Math.min(containerWidth - target.offsetWidth, targetX));
+          targetY = Math.max(0, Math.min(containerHeight - target.offsetHeight, targetY));
+
+          // Update red circle's position
+          target.style.left = `${targetX}px`;
+          target.style.top = `${targetY}px`;
+      }
+
+
+              // Timer for tracking time survived and adding new gray circles
+              function updateTimer() {
+                  if (!isGameOver) {
+                      timeSurvived++;
+                      scoreboard.textContent = timeSurvived;
+
+                      // Add a new gray circle every 30 seconds
+                      if (timeSurvived % 30 === 0) {
+                          createGrayCircle();
+                      }
+
+                      setTimeout(updateTimer, 1000);
+                  }
+              }
+
+        // Check for collisions between the red target and all gray circles
+        function checkCollisions() {
+            const targetCenterX = targetX + targetRadius;
+            const targetCenterY = targetY + targetRadius;
+
+            for (const circle of grayCircles) {
+                const circleCenterX = circle.x + circle.radius;
+                const circleCenterY = circle.y + circle.radius;
+
+                const dx = targetCenterX - circleCenterX;
+                const dy = targetCenterY - circleCenterY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < targetRadius + circle.radius) {
+                    gameOver();
+                    break;
+                }
+            }
+        }
+
+        // Game over logic
+        function gameOver() {
+            isGameOver = true;
+            gameOverText.textContent = `Game Over! You survived for ${timeSurvived} seconds.`;
+            gameOverText.style.display = "block";
+            playAgainButton.style.display = "block";
+        }
+
+        // Reset the game
+        function resetGame() {
+            isGameOver = false;
+            timeSurvived = 0;
+            grayCircles.forEach(circle => circle.element.remove());
+            grayCircles = [];
+            targetX = 100;
+            targetY = 100;
+            target.style.left = `${targetX}px`;
+            target.style.top = `${targetY}px`;
+            gameOverText.style.display = "none";
+            playAgainButton.style.display = "none";
+
+            createGrayCircle();
+            updateTimer();
+            gameLoop();
+        }
+
+        // Main game loop
+        function gameLoop() {
+            if (!isGameOver) {
+                handlePlayerMovement();
+                grayCircles.forEach(moveGrayCircle);
+                checkCollisions();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Key listeners
+        document.addEventListener("keydown", (e) => {
+            keys[e.key] = true;
+        });
+
+        document.addEventListener("keyup", (e) => {
+            keys[e.key] = false;
+        });
+
+        // Initialize game
+        playAgainButton.addEventListener("click", resetGame);
+        resetGame();
+    </script>
+</body>
+</html>
